@@ -31,6 +31,32 @@ docker compose logs -f
 
 最后在飞书群设置 → 机器人 → 添加你的 bot,@ 它即可。
 
+## 预构建镜像(GHCR)
+
+`.github/workflows/docker.yml` 构建 `linux/amd64` + `linux/arm64` 镜像并推送到
+`ghcr.io/<owner>/larkway`(`<owner>` 为仓库所有者,如 `lwshen`):
+
+| 触发            | 推送的 tag                               |
+| --------------- | ---------------------------------------- |
+| push 到 `main`  | `latest`、`sha-<短 sha>`                 |
+| push `v*` tag   | `1.2.3`、`1.2`、`sha-<短 sha>`           |
+| PR 到 `main`    | 只构建两个平台,不推送                    |
+| 手动 (dispatch) | `sha-<短 sha>`;在 `main` 上另加 `latest` |
+
+不想本地 build 时,用它代替快速开始里的 `docker compose build`:
+
+```bash
+export LARKWAY_IMAGE=ghcr.io/<owner>/larkway:latest   # compose 的 image 改为它
+docker compose pull
+```
+
+之后的 `docker compose run` / `up` 命令不变(需在同一 shell 里,或把 `LARKWAY_IMAGE=...` 写进 compose
+同目录的 `.env`)。`latest` 指 `main` 的最新构建,不是正式发布版。
+
+GHCR 的 package 首次推送后可能是私有的:要免登录 `docker pull`,到 GitHub 个人主页 → Packages →
+`larkway` → Package settings 把 visibility 改为 Public;否则先 `docker login ghcr.io`。
+Fork 仓库的 Actions 默认停用,需先在仓库的 Actions 页启用。
+
 ## 与在宿主机上运行的差异
 
 | 项            | 容器里的做法                                                                                          | 原因                                                                                                                       |
@@ -117,6 +143,8 @@ git pull
 docker compose build --pull
 docker compose up -d
 ```
+
+用预构建镜像时把中间一步换成 `docker compose pull`。
 
 `claude` / `codex` / `lark-cli` 在 build 时安装最新版,要更新它们同样重新 build。不要在容器里用
 `larkway update`:它走 `npm i -g` + `larkway stop/start`,前者以非 root 用户写不了全局目录,后者依赖 systemd。

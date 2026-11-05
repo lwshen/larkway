@@ -1,7 +1,8 @@
 # Larkway bridge in a container. Usage, caveats and known limitations: docs/docker.md
 
 # ---- build: bundle the CLI + bridge into dist/ (no node_modules needed at runtime) ----
-FROM node:20-bookworm-slim AS build
+# Pure-JS output, so this stage runs natively on the build host even for cross-arch builds.
+FROM --platform=$BUILDPLATFORM node:20-bookworm-slim AS build
 WORKDIR /src
 RUN corepack enable
 COPY package.json pnpm-lock.yaml ./
