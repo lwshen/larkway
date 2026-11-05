@@ -1,0 +1,23 @@
+# Larkway bridge in a container. See docs/docker.md.
+services:
+  larkway:
+    build: .
+    # Prebuilt image instead of a local build: LARKWAY_IMAGE=ghcr.io/<owner>/larkway:latest (docs/docker.md)
+    image: ${LARKWAY_IMAGE:-larkway:local}
+    init: true # reaps agent subprocesses
+    # Mirrors Larkway's launchd/systemd policy: exit 0 is an intentional stop
+    # (e.g. no bots configured yet), so only restart on failure.
+    restart: on-failure
+    volumes:
+      # Persists ~/.larkway plus the CLI login state: .claude/, .claude.json,
+      # .codex/, .config/glab-cli/, .gitconfig, .ssh/ ...
+      - larkway-home:/home/node
+      # Optional: repositories for an existing-workspace bot (`workspace:` must use the container path).
+      # - ./repos:/workspace/repos
+    # Optional: long-lived Claude subscription token from `claude setup-token` on another machine.
+    # environment:
+    #   CLAUDE_CODE_OAUTH_TOKEN: ${CLAUDE_CODE_OAUTH_TOKEN}
+
+volumes:
+  larkway-home:
+    name: larkway-home # fixed name, independent of the compose project directory
