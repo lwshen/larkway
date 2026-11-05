@@ -1,9 +1,10 @@
 # Larkway bridge in a container. See docs/docker.md.
 services:
   larkway:
-    build: .
-    # Prebuilt image instead of a local build: LARKWAY_IMAGE=ghcr.io/<owner>/larkway:latest (docs/docker.md)
-    image: ${LARKWAY_IMAGE:-larkway:local}
+    # Prebuilt multi-arch image from .github/workflows/docker.yml. No `build:` on purpose:
+    # compose never builds locally. To test a local build (docs/docker.md):
+    #   docker build -t larkway:local . && export LARKWAY_IMAGE=larkway:local
+    image: ${LARKWAY_IMAGE:-ghcr.io/lwshen/larkway:latest}
     init: true # reaps agent subprocesses
     # Mirrors Larkway's launchd/systemd policy: exit 0 is an intentional stop
     # (e.g. no bots configured yet), so only restart on failure.

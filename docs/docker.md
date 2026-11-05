@@ -1,6 +1,7 @@
 # 在 Docker 中运行 Larkway
 
-用仓库根目录的 `Dockerfile` + `docker-compose.yml` 把 bridge 跑在容器里。容器同时就是
+用仓库根目录的 `docker-compose.yml` 把 bridge 跑在容器里,默认使用 CI 推送到 GHCR 的预构建镜像
+`ghcr.io/lwshen/larkway:latest`,不在本地编译(本地测试 `Dockerfile` 见下文)。容器同时就是
 agent 的工作环境:agent 在容器内读写代码、跑命令、开 MR,对宿主机只能看到挂载进来的目录。
 
 镜像内容:Node 20、bridge(`dist/main.js`)、`larkway` CLI、`claude`、`codex`、`lark-cli`、
@@ -11,7 +12,7 @@ agent 的工作环境:agent 在容器内读写代码、跑命令、开 MR,对宿
 在仓库根目录执行:
 
 ```bash
-docker compose build
+docker compose pull   # 拉取 GHCR 镜像(约 2 GB)
 
 # 1. 登录 agent 后端(一次即可,登录态存进 volume)
 docker compose run --rm larkway claude                      # 进入后 /login,完成后退出
@@ -31,10 +32,11 @@ docker compose logs -f
 
 最后在飞书群设置 → 机器人 → 添加你的 bot,@ 它即可。
 
-## 预构建镜像(GHCR)
+## 镜像来源
 
-`.github/workflows/docker.yml` 构建 `linux/amd64` + `linux/arm64` 镜像并推送到
-`ghcr.io/<owner>/larkway`(`<owner>` 为仓库所有者,如 `lwshen`):
+### GHCR 预构建镜像(默认)
+
+`.github/workflows/docker.yml` 构建 `linux/amd64` + `linux/arm64` 镜像并推送到 `ghcr.io/lwshen/larkway`:
 
 | 触发            | 推送的 tag                               |
 | --------------- | ---------------------------------------- |
@@ -43,19 +45,29 @@ docker compose logs -f
 | PR 到 `main`    | 只构建两个平台,不推送                    |
 | 手动 (dispatch) | `sha-<短 sha>`;在 `main` 上另加 `latest` |
 
-不想本地 build 时,用它代替快速开始里的 `docker compose build`:
+`latest` 指 `main` 的最新构建,不是正式发布版。要固定版本,把 compose 里的 tag 换成 `sha-<短 sha>`
+(或用下面的 `LARKWAY_IMAGE` 覆盖)。该 package 公开,`docker pull` 无需登录。
+
+### 本地构建(测试 Dockerfile 或未合并的改动)
+
+compose 文件里**没有** `build:`,它永远不会自己编译。本地测试时用 `docker build` 打一个本地 tag,
+再用 `LARKWAY_IMAGE` 让同一个 compose 文件改用它:
 
 ```bash
-export LARKWAY_IMAGE=ghcr.io/<owner>/larkway:latest   # compose 的 image 改为它
-docker compose pull
+docker build -t larkway:local .
+export LARKWAY_IMAGE=larkway:local
+docker compose up -d            # 其余 run / logs 等命令照常
+# 改代码后:重新 docker build,再 docker compose up -d(镜像变了会自动重建容器)
+
+unset LARKWAY_IMAGE             # 切回 GHCR 镜像
+docker compose up -d
 ```
 
-之后的 `docker compose run` / `up` 命令不变(需在同一 shell 里,或把 `LARKWAY_IMAGE=...` 写进 compose
-同目录的 `.env`)。`latest` 指 `main` 的最新构建,不是正式发布版。
+`LARKWAY_IMAGE` 只对设置它的 shell 生效;想长期使用,可写进 compose 同目录的 `.env`(已在 `.gitignore`)。
+本地模式下不要执行 `docker compose pull`:它会去 Docker Hub 找 `larkway:local` 并报错。
 
-GHCR 的 package 首次推送后可能是私有的:要免登录 `docker pull`,到 GitHub 个人主页 → Packages →
-`larkway` → Package settings 把 visibility 改为 Public;否则先 `docker login ghcr.io`。
-Fork 仓库的 Actions 默认停用,需先在仓库的 Actions 页启用。
+不把 `build:` 放进同一个 compose 文件,原因有两个:一是 GHCR 拉取失败时 compose 会悄悄改为本地编译;
+二是 `docker compose build` 会把本地产物标成 `ghcr.io/...:latest`,让人误以为在跑官方镜像。
 
 ## 与在宿主机上运行的差异
 
@@ -139,14 +151,14 @@ docker compose restart
 ## 升级
 
 ```bash
-git pull
-docker compose build --pull
+git pull              # 更新 compose 文件本身
+docker compose pull
 docker compose up -d
 ```
 
-用预构建镜像时把中间一步换成 `docker compose pull`。
+本地构建模式下改为 `git pull && docker build --pull -t larkway:local . && docker compose up -d`。
 
-`claude` / `codex` / `lark-cli` 在 build 时安装最新版,要更新它们同样重新 build。不要在容器里用
+`claude` / `codex` / `lark-cli` 的版本取决于镜像构建时间(GHCR 镜像即 `main` 最近一次 CI 构建)。不要在容器里用
 `larkway update`:它走 `npm i -g` + `larkway stop/start`,前者以非 root 用户写不了全局目录,后者依赖 systemd。
 
 ## 已知限制
@@ -157,7 +169,8 @@ docker compose up -d
 - **lark-cli 凭据存储未在真实应用上验证**:容器里没有系统 keyring,lark-cli 能否正常持久化 profile
   只在无凭据环境下验证过启动路径。
 - **镜像约 2 GB**:主要是 `claude` / `codex` 的原生二进制。Docker Desktop 默认磁盘上限较小时可能需要调大。
-- **CLI 版本不固定**:除 `glab` 固定版本外,其余 agent CLI 每次 build 取最新版。
+- **CLI 版本不固定**:除 `glab` 固定版本外,其余 agent CLI 每次 build 取最新版。`main` 没有新提交时
+  GHCR 镜像不会重建,里面的 CLI 会逐渐落后;需要时在 Actions 页手动触发 Docker workflow。
 - **工具链需自行补充**:镜像只带通用工具;agent 要构建 / 测试的项目所需的语言运行时(Python、Go、JDK…)
   需要在 Dockerfile 里自行添加。
 - **没有 Web UI**:见上表。
