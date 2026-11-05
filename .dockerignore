@@ -1,0 +1,17 @@
+.git
+node_modules
+dist
+coverage
+*.log
+**/.DS_Store
+
+# Never send local secrets / runtime state / deployment configs into the build context
+.env
+.env.*
+bots/*.yaml
+bots/*.yml
+bots/*.memory.md
+data/
+private/
+.claude/
+.agents/
