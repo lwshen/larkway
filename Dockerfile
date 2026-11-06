@@ -2,7 +2,7 @@
 
 # ---- build: bundle the CLI + bridge into dist/ (no node_modules needed at runtime) ----
 # Pure-JS output, so this stage runs natively on the build host even for cross-arch builds.
-FROM --platform=$BUILDPLATFORM node:20-bookworm-slim AS build
+FROM --platform=$BUILDPLATFORM node:24-bookworm-slim AS build
 WORKDIR /src
 RUN corepack enable
 COPY package.json pnpm-lock.yaml ./
@@ -11,10 +11,11 @@ COPY . .
 RUN pnpm build
 
 # ---- runtime ----
-FROM node:20-bookworm-slim
+FROM node:24-bookworm-slim
 # curl is required by @larksuite/cli's postinstall, which downloads its binary with it.
+# vim (also provides vi) and nano: for editing bots/*.yaml, .env etc. inside the container.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-      git openssh-client ca-certificates curl ripgrep \
+      git openssh-client ca-certificates curl ripgrep vim nano \
   && rm -rf /var/lib/apt/lists/*
 # Agent CLIs (latest at build time; rebuild the image to update them).
 RUN npm i -g @anthropic-ai/claude-code @openai/codex @larksuite/cli

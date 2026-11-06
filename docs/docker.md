@@ -4,8 +4,8 @@
 `ghcr.io/lwshen/larkway:latest`,不在本地编译(本地测试 `Dockerfile` 见下文)。容器同时就是
 agent 的工作环境:agent 在容器内读写代码、跑命令、开 MR,对宿主机只能看到挂载进来的目录。
 
-镜像内容:Node 20、bridge(`dist/main.js`)、`larkway` CLI、`claude`、`codex`、`lark-cli`、
-`glab`、`git`、`ripgrep`;以非 root 用户 `node` 运行,`LARKWAY_HOME=/home/node/.larkway`。
+镜像内容:Node 24、bridge(`dist/main.js`)、`larkway` CLI、`claude`、`codex`、`lark-cli`、
+`glab`、`git`、`ripgrep`、`vim`(含 `vi`)、`nano`;以非 root 用户 `node` 运行,`LARKWAY_HOME=/home/node/.larkway`。
 
 ## 快速开始
 
