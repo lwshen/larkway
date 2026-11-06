@@ -31,6 +31,12 @@ RUN set -eux; \
     grep "  $deb\$" checksums.txt | sha256sum -c -; \
     dpkg -i "$deb"; \
     rm -f "$deb" checksums.txt
+# JDK 21 (Eclipse Temurin) for Java projects the agent builds and tests. Debian bookworm only
+# ships OpenJDK 17, so copy the official multi-arch Temurin build (glibc-linked, runs on
+# bookworm). Tracks the latest 21.x at build time. Maven/Gradle: use the project's wrapper.
+ENV JAVA_HOME=/opt/java/openjdk
+COPY --from=eclipse-temurin:21-jdk $JAVA_HOME $JAVA_HOME
+ENV PATH="${JAVA_HOME}/bin:${PATH}"
 
 WORKDIR /app
 COPY --from=build /src/dist ./dist

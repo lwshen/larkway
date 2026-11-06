@@ -5,7 +5,7 @@
 agent 的工作环境:agent 在容器内读写代码、跑命令、开 MR,对宿主机只能看到挂载进来的目录。
 
 镜像内容:Node 24、bridge(`dist/main.js`)、`larkway` CLI、`claude`、`codex`、`lark-cli`、
-`glab`、`git`、`ripgrep`、`vim`(含 `vi`)、`nano`;以非 root 用户 `node` 运行,`LARKWAY_HOME=/home/node/.larkway`。
+`glab`、`git`、`ripgrep`、`vim`(含 `vi`)、`nano`、JDK 21(Eclipse Temurin,`JAVA_HOME=/opt/java/openjdk`);以非 root 用户 `node` 运行,`LARKWAY_HOME=/home/node/.larkway`。
 
 ## 快速开始
 
@@ -89,7 +89,8 @@ docker compose up -d
 
 compose 把整个 `/home/node` 挂到名为 `larkway-home` 的 volume(名字固定,与 compose 项目目录无关),
 其中包括:`~/.larkway`(bot yaml、`.env`、session、workspace、日志)、`~/.claude` + `~/.claude.json`、
-`~/.codex`、`~/.config/glab-cli`、`~/.gitconfig`、`~/.ssh`。删除这个 volume 等于重置全部配置和登录态。
+`~/.codex`、`~/.config/glab-cli`、`~/.gitconfig`、`~/.ssh`,以及 Java 构建缓存 `~/.m2`、`~/.gradle`
+(可能很大,备份时可以排除)。删除这个 volume 等于重置全部配置和登录态。
 
 ## bot_open_id
 
@@ -168,9 +169,12 @@ docker compose up -d
   `devHostname` 设为宿主机可访问的地址。
 - **lark-cli 凭据存储未在真实应用上验证**:容器里没有系统 keyring,lark-cli 能否正常持久化 profile
   只在无凭据环境下验证过启动路径。
-- **镜像约 2 GB**:主要是 `claude` / `codex` 的原生二进制。Docker Desktop 默认磁盘上限较小时可能需要调大。
+- **镜像约 2.3 GB**:主要是 `claude` / `codex` 的原生二进制和 JDK(约 300 MB)。Docker Desktop 默认磁盘上限较小时可能需要调大。
 - **CLI 版本不固定**:除 `glab` 固定版本外,其余 agent CLI 每次 build 取最新版。`main` 没有新提交时
   GHCR 镜像不会重建,里面的 CLI 会逐渐落后;需要时在 Actions 页手动触发 Docker workflow。
-- **工具链需自行补充**:镜像只带通用工具;agent 要构建 / 测试的项目所需的语言运行时(Python、Go、JDK…)
+- **工具链需自行补充**:除 Node 24 和 JDK 21 外,agent 要构建 / 测试的项目所需的其他语言运行时(Python、Go…)
   需要在 Dockerfile 里自行添加。
+- **Java 构建工具**:镜像不带 Maven / Gradle,用项目自带的 `./mvnw` / `./gradlew`。不要 `apt install maven`:
+  它会连带安装 Debian 的 OpenJDK 17。需要渲染字体的项目(Apache POI 自动列宽、PDF 生成等)还要装 `fontconfig`
+  和字体包。
 - **没有 Web UI**:见上表。
