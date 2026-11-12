@@ -5,7 +5,7 @@
 agent 的工作环境:agent 在容器内读写代码、跑命令、开 MR,对宿主机只能看到挂载进来的目录。
 
 镜像内容:Node 24、bridge(`dist/main.js`)、`larkway` CLI、`claude`、`codex`、`lark-cli`、
-`glab`、`git`、`ripgrep`、`vim`(含 `vi`)、`nano`、JDK 21(Eclipse Temurin,`JAVA_HOME=/opt/java/openjdk`);以非 root 用户 `node` 运行,`LARKWAY_HOME=/home/node/.larkway`。
+`paseo`、`glab`、`git`、`ripgrep`、`vim`(含 `vi`)、`nano`、JDK 21(Eclipse Temurin,`JAVA_HOME=/opt/java/openjdk`);以非 root 用户 `node` 运行,`LARKWAY_HOME=/home/node/.larkway`。
 
 ## 快速开始
 
@@ -92,6 +92,21 @@ compose 把整个 `/home/node` 挂到名为 `larkway-home` 的 volume(名字固�
 `~/.codex`、`~/.config/glab-cli`、`~/.gitconfig`、`~/.ssh`,以及 Java 构建缓存 `~/.m2`、`~/.gradle`
 (可能很大,备份时可以排除)。删除这个 volume 等于重置全部配置和登录态。
 
+## 连接 Paseo
+
+镜像自带 `paseo` CLI,agent 可以用它操作别处的 Paseo daemon(例如你自己电脑上的),经 Paseo relay
+连接,端到端加密,daemon 不必暴露端口:
+
+1. 在 daemon 所在机器上运行 `paseo daemon pair --relay`(或 Paseo Desktop:Settings → host →
+   Pair a device → Enable relay),拿到配对链接 `https://app.paseo.sh/#offer=…`。
+2. 写进容器内的 `~/.larkway/.env`,**必须加双引号**(dotenv 把未加引号值里的 `#` 当注释,链接会被截断):
+   `PASEO_HOST="https://app.paseo.sh/#offer=…"`。bridge 启动时加载这个文件,codex / claude 子进程继承它。
+3. `docker compose restart larkway`,并在 bot workspace 的 `AGENTS.md` 里告诉 agent 可以用 `paseo` CLI。
+
+配对链接等同密码:拿到它就能连上那个 daemon、在那台机器上启动 agent。放进容器后,能在飞书里 @ 这个
+bot 的人都能间接用到它——建议给 daemon 设密码,并把 bot 限定在指定群。只有 bridge 进程会加载
+`~/.larkway/.env`,`docker compose exec larkway paseo …` 手动测试时要自己带上 `PASEO_HOST`。
+
 ## bot_open_id
 
 `larkway init` 会问「Bot 的 Feishu open_id」。可以先回车保留 `ou_placeholder`,但长期使用要填真实值:
@@ -159,7 +174,7 @@ docker compose up -d
 
 本地构建模式下改为 `git pull && docker build --pull -t larkway:local . && docker compose up -d`。
 
-`claude` / `codex` / `lark-cli` 的版本取决于镜像构建时间(GHCR 镜像即 `main` 最近一次 CI 构建)。不要在容器里用
+`claude` / `codex` / `lark-cli` / `paseo` 的版本取决于镜像构建时间(GHCR 镜像即 `main` 最近一次 CI 构建)。不要在容器里用
 `larkway update`:它走 `npm i -g` + `larkway stop/start`,前者以非 root 用户写不了全局目录,后者依赖 systemd。
 
 ## 已知限制
@@ -169,7 +184,7 @@ docker compose up -d
   `devHostname` 设为宿主机可访问的地址。
 - **lark-cli 凭据存储未在真实应用上验证**:容器里没有系统 keyring,lark-cli 能否正常持久化 profile
   只在无凭据环境下验证过启动路径。
-- **镜像约 2.3 GB**:主要是 `claude` / `codex` 的原生二进制和 JDK(约 300 MB)。Docker Desktop 默认磁盘上限较小时可能需要调大。
+- **镜像约 2.9 GB**:主要是 `claude` / `codex` 的原生二进制、`paseo`(连同它依赖的 daemon 包约 580 MB)和 JDK(约 300 MB)。Docker Desktop 默认磁盘上限较小时可能需要调大。
 - **CLI 版本不固定**:除 `glab` 固定版本外,其余 agent CLI 每次 build 取最新版。`main` 没有新提交时
   GHCR 镜像不会重建,里面的 CLI 会逐渐落后;需要时在 Actions 页手动触发 Docker workflow。
 - **工具链需自行补充**:除 Node 24 和 JDK 21 外,agent 要构建 / 测试的项目所需的其他语言运行时(Python、Go…)

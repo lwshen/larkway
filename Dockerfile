@@ -19,6 +19,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   && rm -rf /var/lib/apt/lists/*
 # Agent CLIs (latest at build time; rebuild the image to update them).
 RUN npm i -g @anthropic-ai/claude-code @openai/codex @larksuite/cli
+# Paseo CLI (latest at build time): lets the agent drive a Paseo daemon elsewhere, e.g. the
+# user's own computer over the relay via PASEO_HOST (docs/docker.md). node-pty ships linux
+# x64/arm64 prebuilds, so no compiler toolchain is needed.
+RUN npm i -g @getpaseo/cli
 # glab (GitLab CLI): pinned release .deb, verified against the release's checksums.txt.
 ARG GLAB_VERSION=1.123.0
 ARG TARGETARCH
